@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HDFC Statement Analyzer & Export</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'none'; img-src 'self' data:; object-src 'none';">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'none'; img-src 'self' data:; object-src 'none';">
     <link rel="stylesheet" href="./src/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -47,7 +47,7 @@
                     <div class="action-panel">
                         <div class="field">
                             <label for="password-input">Statement Password <span class="help-trigger" title="Usually your PAN (Caps) + DOB (DDMM)">?</span></label>
-                            <input type="password" id="password-input" placeholder="e.g. ABCDE1234F01011990" autocomplete="current-password">
+                            <input type="password" id="password-input" placeholder="e.g. PAN + DOB (DDMMYYYY)" autocomplete="off">
                         </div>
                         <div class="button-group">
                             <button id="process-btn" class="btn primary" disabled>Analyze</button>
@@ -148,6 +148,9 @@
                     <div class="editor-btns">
                         <button id="add-category" class="btn small">+ Add Category</button>
                         <div class="right">
+                            <button id="export-categories" class="btn small text">Export Rules (JSON)</button>
+                            <button id="import-categories-trigger" class="btn small text">Import Rules</button>
+                            <input type="file" id="category-import" accept=".json" hidden>
                             <button id="reset-categories" class="btn small text">Reset Defaults</button>
                             <button id="save-categories" class="btn primary small">Save Changes</button>
                         </div>

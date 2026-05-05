@@ -1,6 +1,15 @@
-# HDFC CC bill parser
+# HDFC CC bill parser (Rust + WASM)
 
 Parse and extract transaction data from HDFC Bank credit card statements to CSV format.
+
+## 🛡️ VaultHDFC Webapp
+A "Vault-Grade" privacy-preserving web application that runs entirely in your browser.
+- **100% Client-Side**: No data ever leaves your machine.
+- **Zero-Trust**: Strict CSP prevents all networking.
+- **Offline Mode**: Works without Wi-Fi.
+- **WASM Powered**: Uses the Rust parser compiled to WebAssembly.
+
+Located in the `webapp/` directory.
 
 > **Note:** This tool currently supports only below cards
 > - **HDFC Infinia credit card statements from September 2025 onwards**. Earlier statement formats are not supported.

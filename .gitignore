@@ -1,3 +1,4 @@
+.DS_Store
 target/
 **/*.rs.bk
 Cargo.lock
@@ -5,8 +6,16 @@ Cargo.lock
 **/perf.data
 **/perf.data.old
 
-!.travis.yml
+# Webapp Exclusions
+webapp/node_modules/
+webapp/dist/
+webapp/pkg/
 
+# Temporary Binaries
+wasm-pack
+wasm-pack.tar.gz
+
+!.travis.yml
 /fonts
 output.csv
 .idea/

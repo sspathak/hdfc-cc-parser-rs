@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vault HDFC - Private Statement Analyzer</title>
+    <!-- Strict CSP: Absolute Privacy -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'none'; img-src 'self' data:; object-src 'none';">
+    <link rel="stylesheet" href="/src/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Outfit:wght@400;600&display=swap" rel="stylesheet">
+</head>
+<body class="dark-theme">
+    <div id="app">
+        <header>
+            <div class="logo">
+                <span class="shield-icon">🛡️</span>
+                <h1>Vault<span>HDFC</span></h1>
+            </div>
+            <nav>
+                <button id="nav-dashboard" class="active">Dashboard</button>
+                <button id="nav-categories">Categories</button>
+                <button id="nav-security">Security & Privacy</button>
+            </nav>
+        </header>
+
+        <main>
+            <!-- Dashboard View -->
+            <section id="view-dashboard" class="view">
+                <div class="hero-section">
+                    <h2>Analyze your spending with <span>Zero-Trust</span></h2>
+                    <p>Your data never leaves your browser. 100% Offline. 100% Private.</p>
+                </div>
+
+                <div class="upload-container glass">
+                    <div id="drop-zone" class="drop-zone">
+                        <div class="drop-zone-content">
+                            <span class="upload-icon">📄</span>
+                            <p>Drop your HDFC PDF statements here or <span>browse</span></p>
+                            <input type="file" id="file-input" multiple accept=".pdf" hidden>
+                        </div>
+                    </div>
+                    
+                    <div class="password-area">
+                        <input type="password" id="password-input" placeholder="Statement Password (PAN + DOB)" autocomplete="current-password">
+                        <button id="process-btn" disabled>Analyze Statements</button>
+                    </div>
+                </div>
+
+                <div id="status-container" class="hidden">
+                    <div class="progress-bar"><div id="progress-fill"></div></div>
+                    <p id="status-text">Ready to process...</p>
+                </div>
+
+                <div id="results-area" class="hidden">
+                    <div class="stats-grid">
+                        <div class="stat-card glass">
+                            <h3>Total Spent</h3>
+                            <p id="total-spent">₹0.00</p>
+                        </div>
+                        <div class="stat-card glass">
+                            <h3>Points Earned</h3>
+                            <p id="total-points">0</p>
+                        </div>
+                        <div class="stat-card glass">
+                            <h3>Transactions</h3>
+                            <p id="total-count">0</p>
+                        </div>
+                    </div>
+
+                    <div class="charts-container">
+                        <div class="chart-wrapper glass">
+                            <h3>Monthly Trend</h3>
+                            <canvas id="trend-chart"></canvas>
+                        </div>
+                        <div class="chart-wrapper glass">
+                            <h3>Category Breakdown</h3>
+                            <canvas id="category-chart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="actions-footer">
+                        <button id="download-csv" class="secondary">Download CSV</button>
+                        <button id="clear-data" class="danger">Clear Session</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Categories View -->
+            <section id="view-categories" class="view hidden">
+                <div class="view-header">
+                    <h2>Manage Categories</h2>
+                    <p>Definitions are saved locally in your browser for convenience.</p>
+                </div>
+                <div class="category-editor glass">
+                    <div id="category-list"></div>
+                    <button id="add-category" class="secondary">+ Add Category</button>
+                    <div class="editor-actions">
+                        <button id="save-categories">Save Categories</button>
+                        <button id="reset-categories" class="secondary">Reset to Default</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Security View -->
+            <section id="view-security" class="view hidden">
+                <div class="view-header">
+                    <h2>How it Works: Vault-Grade Privacy</h2>
+                </div>
+                <div class="security-info glass">
+                    <div class="info-section">
+                        <h3>1. No Network Connection</h3>
+                        <p>This app uses a strict Content Security Policy that disables all network requests (`connect-src 'none'`). Even if the app wanted to send your data, the browser would block it.</p>
+                    </div>
+                    <div class="info-section">
+                        <h3>2. WebAssembly (WASM) Isolation</h3>
+                        <p>The PDF parsing engine is a Rust-compiled binary that runs in a separate Web Worker. It exists entirely in your device's memory.</p>
+                    </div>
+                    <div class="info-section">
+                        <h3>3. Zero Persistence</h3>
+                        <p>Your transactions are never saved to disk. When you refresh the page or click 'Clear Session', all parsed data is permanently wiped from memory.</p>
+                    </div>
+                    <div class="info-section">
+                        <h3>4. Open Source Audit</h3>
+                        <p>The logic is transparent and can be audited by any security professional. We prioritize privacy over everything.</p>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer>
+            <p>&copy; 2026 VaultHDFC. Developed with Privacy in Mind.</p>
+            <div class="offline-badge" id="offline-status">
+                <span class="status-dot"></span> Ready Offline
+            </div>
+        </footer>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,2 @@
+# This file tells GitHub Pages not to run Jekyll on our site.
+# This is necessary because WASM files and some JS assets might otherwise be ignored.

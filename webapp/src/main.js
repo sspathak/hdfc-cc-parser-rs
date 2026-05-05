@@ -1,4 +1,6 @@
 import { AnalysisEngine } from './analysis.js';
+import { Chart, registerables } from 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm';
+Chart.register(...registerables);
 
 // DOM Elements
 const views = document.querySelectorAll('.view');
@@ -47,7 +49,9 @@ navButtons.forEach(btn => {
     btn.addEventListener('click', () => {
         const targetView = `view-${btn.id.split('-')[1]}`;
         views.forEach(v => v.classList.add('hidden'));
-        document.getElementById(targetView).classList.remove('hidden');
+        const targetEl = document.getElementById(targetView);
+        if (targetEl) targetEl.classList.remove('hidden');
+        
         navButtons.forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         
@@ -119,16 +123,6 @@ let trendChart = null;
 let categoryChart = null;
 
 async function renderCharts(chartData) {
-    // Wait for Chart.js to be available if loaded via script tag
-    // Or if imported, use the import. For simplicity and SRI, we might use script tag in index.html
-    // but here we'll assume it's available globally or we import it.
-    
-    const Chart = window.Chart;
-    if (!Chart) {
-        console.error("Chart.js not found");
-        return;
-    }
-
     if (trendChart) trendChart.destroy();
     if (categoryChart) categoryChart.destroy();
 
@@ -140,14 +134,35 @@ async function renderCharts(chartData) {
             datasets: [{
                 label: 'Total Spending',
                 data: chartData.totals,
-                backgroundColor: '#4f46e5',
-                borderRadius: 4
+                backgroundColor: '#6366f1',
+                borderRadius: 8,
+                barThickness: 32,
             }]
         },
         options: {
             responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true } }
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: '#1e293b',
+                    titleFont: { family: 'Outfit', size: 14 },
+                    bodyFont: { family: 'Plus Jakarta Sans', size: 13 },
+                    padding: 12,
+                    displayColors: false
+                }
+            },
+            scales: { 
+                y: { 
+                    beginAtZero: true,
+                    grid: { color: 'rgba(255,255,255,0.05)' },
+                    ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans' } }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans' } }
+                }
+            }
         }
     });
 
@@ -159,15 +174,23 @@ async function renderCharts(chartData) {
             datasets: [{
                 data: chartData.categoryData.map(d => d.data.reduce((a, b) => a + b, 0)),
                 backgroundColor: [
-                    '#4f46e5', '#10b981', '#f59e0b', '#ef4444', 
-                    '#8b5cf6', '#ec4899', '#06b6d4', '#f97316', '#64748b'
+                    '#6366f1', '#8b5cf6', '#10b981', '#f59e0b', 
+                    '#ef4444', '#ec4899', '#06b6d4', '#f97316', '#64748b'
                 ],
-                borderWidth: 0
+                borderWidth: 0,
+                hoverOffset: 15
             }]
         },
         options: {
             responsive: true,
-            plugins: { legend: { position: 'right' } }
+            maintainAspectRatio: false,
+            cutout: '70%',
+            plugins: { 
+                legend: { 
+                    position: 'right',
+                    labels: { color: '#f8fafc', font: { family: 'Plus Jakarta Sans', size: 12 }, padding: 20 }
+                }
+            }
         }
     });
 }
@@ -250,16 +273,6 @@ document.getElementById('clear-data').addEventListener('click', () => {
         window.location.reload();
     }
 });
-
-// Load Chart.js with SRI
-(function() {
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js';
-    script.integrity = 'sha384-S3YY4o63Gv5fL7/XWw+fI8pJHMTd5T9mS8qC0F6yVvG1V+Z5vI5u6z9z7w2e4r5t'; // Placeholder, will fix SRI
-    script.crossOrigin = 'anonymous';
-    script.onload = () => console.log("Chart.js loaded safely.");
-    document.head.appendChild(script);
-})();
 
 // Service Worker Registration for Offline Support
 if ('serviceWorker' in navigator) {

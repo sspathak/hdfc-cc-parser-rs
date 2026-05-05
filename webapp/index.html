@@ -3,200 +3,174 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Vault HDFC | Zero-Trust Statement Analysis</title>
+    <title>HDFC Statement Analyzer & Export</title>
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; connect-src 'none'; img-src 'self' data:; object-src 'none';">
     <link rel="stylesheet" href="./src/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=Plus+Jakarta+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body class="dark-theme">
+<body class="light-theme">
     <div id="app">
-        <header class="glass">
+        <header>
             <div class="logo">
-                <div class="logo-shield">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                </div>
-                <h1>Vault<span>HDFC</span></h1>
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                <h1>HDFC <span>Statement Analyzer</span></h1>
             </div>
             <nav>
-                <button id="nav-dashboard" class="nav-link active">Dashboard</button>
-                <button id="nav-categories" class="nav-link">Categories</button>
-                <button id="nav-security" class="nav-link">Security</button>
-                <button id="nav-about" class="nav-link">About</button>
+                <button id="nav-dashboard" class="nav-link active">Analysis</button>
+                <button id="nav-categories" class="nav-link">Settings</button>
+                <button id="nav-about" class="nav-link">How it works</button>
             </nav>
         </header>
 
         <main>
             <!-- Dashboard View -->
             <section id="view-dashboard" class="view">
-                <div class="welcome-header">
-                    <h2>Welcome to <span>Private Analysis</span></h2>
-                    <p>Your financial data is processed in a secure WASM sandbox and never leaves this device.</p>
+                <div class="tool-header">
+                    <h2>Process Statements</h2>
+                    <p>Extract transactions and generate spending reports locally.</p>
                 </div>
 
-                <div class="main-card glass">
-                    <div id="drop-zone" class="upload-zone">
-                        <div class="upload-pulse"></div>
-                        <div class="upload-content">
-                            <div class="icon-circle">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                            </div>
-                            <h3>Upload Statements</h3>
-                            <p>Drag and drop HDFC PDF statements here</p>
-                            <span class="browse-label">or browse files</span>
+                <div class="input-card">
+                    <div id="drop-zone" class="upload-area">
+                        <div class="upload-prompt">
+                            <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            <p>Click or drag HDFC PDF statements</p>
                             <input type="file" id="file-input" multiple accept=".pdf" hidden>
                         </div>
+                        <div id="file-list" class="file-list hidden"></div>
                     </div>
                     
-                    <div class="control-panel">
-                        <div class="input-group">
-                            <label for="password-input">Statement Password</label>
-                            <input type="password" id="password-input" placeholder="Enter password (e.g. PAN + DOB)" autocomplete="current-password">
+                    <div class="action-panel">
+                        <div class="field">
+                            <label for="password-input">Statement Password <span class="help-trigger" title="Usually your PAN (Caps) + DOB (DDMM)">?</span></label>
+                            <input type="password" id="password-input" placeholder="e.g. ABCDE1234F01011990" autocomplete="current-password">
                         </div>
-                        <button id="process-btn" class="primary-btn" disabled>
-                            <span>Analyze Now</span>
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
-                        </button>
+                        <div class="button-group">
+                            <button id="process-btn" class="btn primary" disabled>Analyze Now</button>
+                            <button id="quick-export-btn" class="btn secondary" disabled>Export CSV</button>
+                        </div>
                     </div>
                 </div>
 
-                <div id="status-container" class="hidden">
-                    <div class="processing-card glass">
-                        <div class="spinner"></div>
-                        <p id="status-text">Waking up WASM engine...</p>
-                        <div class="progress-track"><div id="progress-fill"></div></div>
-                    </div>
+                <div id="status-container" class="status-box hidden">
+                    <div class="spinner"></div>
+                    <span id="status-text">Processing...</span>
+                    <div class="progress-bar"><div id="progress-fill"></div></div>
                 </div>
 
-                <div id="results-area" class="hidden animate-in">
-                    <div class="stats-grid">
-                        <div class="stat-card glass highlight-spent">
-                            <label>Total Spent</label>
-                            <div class="value" id="total-spent">₹0.00</div>
-                            <div class="trend positive">Spending is tracked in-memory</div>
+                <div id="results-area" class="results-container hidden">
+                    <div class="summary-stats">
+                        <div class="stat">
+                            <span class="label">Total Spent</span>
+                            <span class="value" id="total-spent">₹0.00</span>
                         </div>
-                        <div class="stat-card glass highlight-points">
-                            <label>Points Earned</label>
-                            <div class="value" id="total-points">0</div>
-                            <div class="trend">Reward summary</div>
+                        <div class="stat">
+                            <span class="label">Points</span>
+                            <span class="value" id="total-points">0</span>
                         </div>
-                        <div class="stat-card glass highlight-tx">
-                            <label>Transactions</label>
-                            <div class="value" id="total-count">0</div>
-                            <div class="trend">Extracted successfully</div>
+                        <div class="stat">
+                            <span class="label">Count</span>
+                            <span class="value" id="total-count">0</span>
                         </div>
                     </div>
 
-                    <div class="dashboard-grid">
-                        <div class="chart-container glass">
-                            <div class="chart-header">
-                                <h3>Spending Timeline</h3>
-                                <div class="chart-actions"></div>
-                            </div>
-                            <div class="canvas-holder">
-                                <canvas id="trend-chart"></canvas>
-                            </div>
+                    <div class="visuals-grid">
+                        <div class="chart-box">
+                            <h3>Monthly Trend</h3>
+                            <div class="canvas-wrapper"><canvas id="trend-chart"></canvas></div>
                         </div>
-                        <div class="chart-container glass">
-                            <div class="chart-header">
-                                <h3>Category Split</h3>
-                            </div>
-                            <div class="canvas-holder">
-                                <canvas id="category-chart"></canvas>
-                            </div>
+                        <div class="chart-box">
+                            <h3>Category Breakdown</h3>
+                            <div class="canvas-wrapper"><canvas id="category-chart"></canvas></div>
                         </div>
                     </div>
 
-                    <div class="page-actions">
-                        <button id="download-csv" class="action-btn">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                            Export CSV
+                    <div class="footer-actions">
+                        <button id="download-csv" class="btn icon-btn">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            <span>Download CSV</span>
                         </button>
-                        <button id="clear-data" class="action-btn danger">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                            Wipe Memory
+                        <button id="clear-data" class="btn icon-btn danger">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            <span>Clear Session</span>
                         </button>
                     </div>
                 </div>
             </section>
 
-            <!-- Categories View -->
+            <!-- Settings View -->
             <section id="view-categories" class="view hidden">
-                <div class="section-header">
-                    <h2>Categorization <span>Logic</span></h2>
-                    <p>Customize how merchants are grouped. Rules are stored locally.</p>
+                <div class="tool-header">
+                    <h2>Analysis Settings</h2>
+                    <p>Configure how transactions are categorized.</p>
                 </div>
-                <div class="editor-card glass">
-                    <div id="category-list" class="category-items"></div>
-                    <div class="editor-footer">
-                        <button id="add-category" class="ghost-btn">+ Add Row</button>
-                        <div class="btn-group">
-                            <button id="reset-categories" class="secondary-btn">Defaults</button>
-                            <button id="save-categories" class="primary-btn">Save Rules</button>
+                <div class="settings-card">
+                    <div id="category-list" class="cat-editor"></div>
+                    <div class="editor-btns">
+                        <button id="add-category" class="btn small">+ Add Merchant Rule</button>
+                        <div class="right">
+                            <button id="reset-categories" class="btn small text">Reset Defaults</button>
+                            <button id="save-categories" class="btn primary small">Save Changes</button>
                         </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Security View -->
-            <section id="view-security" class="view hidden">
-                <div class="section-header">
-                    <h2>Security <span>Manifesto</span></h2>
-                </div>
-                <div class="security-grid">
-                    <div class="security-card glass">
-                        <div class="card-icon">🚫</div>
-                        <h3>Hardened CSP</h3>
-                        <p>The <code>connect-src 'none'</code> policy physically prevents the browser from making any network requests. Data exfiltration is impossible.</p>
-                    </div>
-                    <div class="security-card glass">
-                        <div class="card-icon">🧠</div>
-                        <h3>WASM Engine</h3>
-                        <p>Parsing is performed by a high-performance Rust engine compiled to WebAssembly, running in a sandboxed Web Worker.</p>
-                    </div>
-                    <div class="security-card glass">
-                        <div class="card-icon">🌪️</div>
-                        <h3>Zero Persistence</h3>
-                        <p>Transactions exist only in volatile RAM. No data is written to localStorage or IndexedDB. A refresh wipes everything.</p>
                     </div>
                 </div>
             </section>
 
             <!-- About View -->
             <section id="view-about" class="view hidden">
-                <div class="section-header">
-                    <h2>About <span>VaultHDFC</span></h2>
+                <div class="tool-header">
+                    <h2>How it works</h2>
+                    <p>Understanding the privacy-first architecture of this utility.</p>
                 </div>
-                <div class="about-content glass">
-                    <div class="markdown-body">
-                        <h3>Private Credit Card Analysis</h3>
-                        <p>VaultHDFC was built for people who want to understand their spending without uploading sensitive bank statements to third-party servers.</p>
-                        <p>Every calculation, from PDF decryption to category matching, happens entirely on your machine.</p>
-                        <hr>
-                        <h4>Key Features</h4>
-                        <ul>
-                            <li><strong>Multi-file support</strong>: Upload several months at once.</li>
-                            <li><strong>Fast</strong>: Rust-powered parsing takes milliseconds.</li>
-                            <li><strong>Offline</strong>: Works without an internet connection.</li>
-                        </ul>
-                    </div>
+                <div class="info-card">
+                    <h3>Privacy by Design</h3>
+                    <p>Financial data is deeply sensitive. Traditional spend analyzers require you to upload your bank statements to their servers, creating a significant privacy risk. This tool is designed to respect your data by ensuring it <strong>never leaves your device</strong>.</p>
+                    <p>All decryption, parsing, and analysis are performed by a high-performance Rust engine compiled to WebAssembly (WASM), running entirely within your browser's local memory.</p>
+                    
+                    <h3>Technical Transparency</h3>
+                    <p>Security should be verifiable, not just promised. This application is entirely open-source. You can view, audit, and verify the source code for both the parsing engine and the web interface on GitHub:</p>
+                    <p><a href="https://github.com/sspathak/hdfc-cc-parser-rs" target="_blank" class="repo-link">View Source on GitHub &rarr;</a></p>
+
+                    <h3>Security Safeguards</h3>
+                    <ul class="check-list">
+                        <li><strong>Zero Networking</strong>: A strict browser policy blocks all external network requests.</li>
+                        <li><strong>In-Memory Only</strong>: Statements are processed in volatile RAM and are lost immediately on page refresh.</li>
+                        <li><strong>No Tracking</strong>: There are no analytics, cookies, or tracking scripts included in this tool.</li>
+                    </ul>
+
+                    <hr class="divider">
+
+                    <h3>Credits</h3>
+                    <p>This project is a web-based implementation of the HDFC Credit Card Parser. Special thanks to the original author for the core parsing logic:</p>
+                    <p>Forked from: <a href="https://github.com/joeirimpan/hdfc-cc-parser-rs" target="_blank">joeirimpan/hdfc-cc-parser-rs</a></p>
                 </div>
             </section>
         </main>
 
-        <footer class="glass-footer">
-            <div class="footer-status">
-                <div class="status-indicator">
-                    <span class="pulse"></span>
-                    <span>System Secure</span>
-                </div>
-                <div class="offline-badge">Offline Capable</div>
+        <footer>
+            <div class="security-status" id="security-info-trigger">
+                <div class="status-dot"></div>
+                <span>Local Processing Active</span>
+                <span class="info-icon">?</span>
             </div>
-            <div class="footer-links">
-                &copy; 2026 VaultHDFC | Privacy First
-            </div>
+            <div class="footer-note">HDFC Statement Utility &copy; 2026</div>
         </footer>
+
+        <!-- Security Info Modal (Simple) -->
+        <div id="security-modal" class="modal hidden">
+            <div class="modal-content">
+                <h3>Security Verification</h3>
+                <p>To ensure your data remains private, the following checks are active:</p>
+                <ul>
+                    <li><strong>Network Isolation</strong>: <code>connect-src 'none'</code> CSP is active.</li>
+                    <li><strong>Sandboxed Engine</strong>: Rust/WASM parsing in a separate thread.</li>
+                    <li><strong>Volatile Storage</strong>: Data is lost immediately on page refresh.</li>
+                </ul>
+                <button id="close-modal" class="btn primary small">Close</button>
+            </div>
+        </div>
     </div>
     <script type="module" src="./src/main.js"></script>
 </body>

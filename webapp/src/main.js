@@ -163,7 +163,7 @@ function startProcessing() {
 }
 
 function renderViewport() {
-    const results = engine.process(allTransactions, []);
+    const results = engine.process(allTransactions, null);
     
     // Clear dropdown and populate
     holderCheckboxes.innerHTML = results.allCardholders.map(name => `

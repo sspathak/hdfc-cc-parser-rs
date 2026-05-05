@@ -61,7 +61,7 @@ nav { display: flex; gap: 1rem; }
 
 main { flex: 1; padding-bottom: 4rem; }
 
-.view.hidden { display: none; }
+.hidden { display: none !important; }
 
 .tool-header { margin-bottom: 2rem; text-align: left; }
 .tool-header h2 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.5rem; }

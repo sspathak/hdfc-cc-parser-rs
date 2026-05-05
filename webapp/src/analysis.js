@@ -12,16 +12,59 @@ export const DEFAULT_CATEGORIES = {
 
 export class AnalysisEngine {
     constructor() {
-        this.categories = JSON.parse(localStorage.getItem('hdfc_categories')) || DEFAULT_CATEGORIES;
+        this.categories = DEFAULT_CATEGORIES;
     }
 
     saveCategories(categories) {
         if (!categories) {
             this.categories = DEFAULT_CATEGORIES;
-            localStorage.removeItem('hdfc_categories');
         } else {
             this.categories = categories;
-            localStorage.setItem('hdfc_categories', JSON.stringify(categories));
+        }
+    }
+
+    exportCategories() {
+        const data = JSON.stringify(this.categories, null, 2);
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `hdfc_categorization_rules_${new Date().toISOString().split('T')[0]}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+
+    async importCategories(file) {
+        try {
+            const text = await file.text();
+            const imported = JSON.parse(text);
+            
+            // Basic validation and sanitization
+            const clean = {};
+            for (const [cat, patterns] of Object.entries(imported)) {
+                if (typeof cat === 'string' && Array.isArray(patterns)) {
+                    // Sanitize category name (alphanumeric and spaces)
+                    const cleanCat = cat.replace(/[^\w\s]/gi, '').substring(0, 50);
+                    // Sanitize patterns (alphanumeric and spaces)
+                    const cleanPatterns = patterns
+                        .filter(p => typeof p === 'string')
+                        .map(p => p.replace(/[^\w\s]/gi, '').substring(0, 100))
+                        .filter(p => p.length > 0);
+                    
+                    if (cleanCat && cleanPatterns.length > 0) {
+                        clean[cleanCat] = cleanPatterns;
+                    }
+                }
+            }
+            
+            if (Object.keys(clean).length > 0) {
+                this.categories = clean;
+                return true;
+            }
+            return false;
+        } catch (e) {
+            console.error("Import error:", e);
+            return false;
         }
     }
 

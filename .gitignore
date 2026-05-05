@@ -1,7 +1,6 @@
 .DS_Store
 target/
 **/*.rs.bk
-Cargo.lock
 **/*.orig
 **/perf.data
 **/perf.data.old

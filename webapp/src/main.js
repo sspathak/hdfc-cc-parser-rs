@@ -1,5 +1,5 @@
 import { AnalysisEngine } from './analysis.js';
-import { Chart, registerables } from 'https://cdn.jsdelivr.net/npm/chart.js@4.4.0/+esm';
+import { Chart, registerables } from 'chart.js';
 Chart.register(...registerables);
 
 // DOM Elements
@@ -117,12 +117,14 @@ fileInput.addEventListener('change', () => handleFiles(fileInput.files));
 function handleFiles(files) {
     selectedFiles = Array.from(files).filter(f => f.type === 'application/pdf');
     if (selectedFiles.length > 0) {
-        fileList.innerHTML = selectedFiles.map(f => `
-            <div class="file-item">
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
-                ${f.name}
-            </div>
-        `).join('');
+        fileList.innerHTML = '';
+        selectedFiles.forEach(f => {
+            const div = document.createElement('div');
+            div.className = 'file-item';
+            div.innerHTML = `<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>`;
+            div.appendChild(document.createTextNode(` ${f.name}`));
+            fileList.appendChild(div);
+        });
         fileList.classList.remove('hidden');
         document.querySelector('.upload-prompt').classList.add('hidden');
         checkReady();
@@ -160,21 +162,33 @@ function startProcessing() {
         files: selectedFiles,
         password: passwordInput.value
     });
+    
+    // Zero-out password immediately for privacy
+    passwordInput.value = '';
+    checkReady();
 }
 
 function renderViewport() {
     const results = engine.process(allTransactions, null);
     
-    // Clear dropdown and populate
-    holderCheckboxes.innerHTML = results.allCardholders.map(name => `
-        <label class="checkbox-item">
-            <input type="checkbox" value="${name}" checked>
-            <span>${name}</span>
-        </label>
-    `).join('');
-    
-    holderCheckboxes.querySelectorAll('input').forEach(input => {
+    // Clear dropdown and populate safely
+    holderCheckboxes.innerHTML = '';
+    results.allCardholders.forEach(name => {
+        const label = document.createElement('label');
+        label.className = 'checkbox-item';
+        
+        const input = document.createElement('input');
+        input.type = 'checkbox';
+        input.value = name;
+        input.checked = true;
         input.addEventListener('change', updateFilteredView);
+        
+        const span = document.createElement('span');
+        span.textContent = name;
+        
+        label.appendChild(input);
+        label.appendChild(span);
+        holderCheckboxes.appendChild(label);
     });
 
     resultsArea.classList.remove('hidden');
@@ -323,7 +337,29 @@ document.getElementById('save-categories').addEventListener('click', () => {
         if (name && patterns.length > 0) newCategories[name] = patterns;
     });
     engine.saveCategories(newCategories);
-    alert('Settings saved.');
+    alert('Settings saved for this session.');
+});
+
+// Category Import/Export
+document.getElementById('export-categories').addEventListener('click', () => {
+    engine.exportCategories();
+});
+
+document.getElementById('import-categories-trigger').addEventListener('click', () => {
+    document.getElementById('category-import').click();
+});
+
+document.getElementById('category-import').addEventListener('change', async (e) => {
+    if (e.target.files.length > 0) {
+        const success = await engine.importCategories(e.target.files[0]);
+        if (success) {
+            renderCategoryEditor();
+            alert('Categories imported successfully.');
+        } else {
+            alert('Failed to import categories. Invalid file format.');
+        }
+        e.target.value = ''; // Reset input
+    }
 });
 
 // CSV Download

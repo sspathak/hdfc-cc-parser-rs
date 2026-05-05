@@ -19,6 +19,7 @@ pub struct Transaction {
     pub description: String,
     pub points: i32,
     pub amount: f32,
+    pub cardholder: String,
 }
 
 impl Default for Transaction {
@@ -31,6 +32,7 @@ impl Default for Transaction {
             description: String::new(),
             points: 0,
             amount: 0.0,
+            cardholder: String::new(),
         }
     }
 }
@@ -38,12 +40,15 @@ impl Default for Transaction {
 impl Transaction {
     /// Send this transaction to the CSV writer channel.
     fn emit(&self, sender: &Sender<Vec<String>>) -> Result<(), Error> {
+        let dr_cr = if self.amount < 0.0 { "DR" } else { "CR" };
         sender
             .send(vec![
-                self.date.to_string(),
+                self.date.format("%Y-%m-%d").to_string(),
                 self.description.clone(),
                 self.points.to_string(),
-                self.amount.to_string(),
+                self.amount.abs().to_string(),
+                dr_cr.to_string(),
+                self.cardholder.clone(),
             ])
             .context("Failed to send transaction to writer")
     }
@@ -70,6 +75,12 @@ fn parse_transaction_date(s: &str) -> Option<NaiveDateTime> {
     }
     // Try date-only format
     if let Ok(d) = NaiveDate::parse_from_str(s, "%d/%m/%Y") {
+        return Some(NaiveDateTime::new(
+            d,
+            NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
+        ));
+    }
+    if let Ok(d) = NaiveDate::parse_from_str(s, "%d-%b-%Y") {
         return Some(NaiveDateTime::new(
             d,
             NaiveTime::from_hms_opt(0, 0, 0).unwrap(),
@@ -156,7 +167,7 @@ fn is_foreign_currency(text: &str) -> bool {
 
 /// Check if text should be skipped (standalone symbols/markers).
 fn is_skippable_symbol(text: &str) -> bool {
-    matches!(text, "+" | "C" | "₹" | "l" | "●" | "•" | "Cr")
+    matches!(text, "+" | "C" | "₹" | "l" | "●" | "•" | "Cr" | "CR" | "Dr" | "DR")
 }
 
 // ============================================================================
@@ -207,7 +218,9 @@ fn categorize(description: &str, categories: &HashMap<String, Vec<String>>) -> O
 fn parse_record(record: &[String]) -> (String, i32, f32) {
     let description = record.get(1).cloned().unwrap_or_default();
     let points = record.get(2).and_then(|s| s.parse().ok()).unwrap_or(0);
-    let amount = record.get(3).and_then(|s| s.parse().ok()).unwrap_or(0.0);
+    let abs_amount = record.get(3).and_then(|s| s.parse::<f32>().ok()).unwrap_or(0.0);
+    let dr_cr = record.get(4).map(|s| s.as_str()).unwrap_or("DR");
+    let amount = if dr_cr == "CR" { abs_amount } else { -abs_amount };
     (description, points, amount)
 }
 
@@ -320,6 +333,8 @@ fn extract_page_texts(ops: &[Op]) -> Vec<String> {
 struct ParserState {
     in_transactions: bool,
     past_header: bool,
+    name_matched: bool,
+    current_cardholder: String,
     skip_next_non_date: bool,
     in_row: bool,
     has_amount: bool,
@@ -334,6 +349,8 @@ impl ParserState {
         ParserState {
             in_transactions: false,
             past_header: false,
+            name_matched: false,
+            current_cardholder: String::new(),
             skip_next_non_date: false,
             in_row: false,
             has_amount: false,
@@ -350,6 +367,7 @@ impl ParserState {
             if !self.desc_parts.is_empty() {
                 self.transaction.description = self.desc_parts.join(" ");
             }
+            self.transaction.cardholder = self.current_cardholder.clone();
             self.transaction.emit(sender)?;
             if self.debug {
                 eprintln!("=== EMIT ({}): {:?} ===", reason, self.transaction);
@@ -362,6 +380,7 @@ impl ParserState {
     fn start_new_transaction(&mut self, date: NaiveDateTime) {
         self.transaction = Transaction::default();
         self.transaction.date = date;
+        self.transaction.cardholder = self.current_cardholder.clone();
         self.in_row = true;
         self.has_amount = false;
         self.is_credit = false;
@@ -371,6 +390,9 @@ impl ParserState {
     /// Reset state when exiting a transaction section.
     fn exit_section(&mut self) {
         self.in_transactions = false;
+        self.past_header = false;
+        self.name_matched = false;
+        self.current_cardholder = String::new();
         self.transaction = Transaction::default();
         self.in_row = false;
         self.has_amount = false;
@@ -412,6 +434,7 @@ pub fn parse(
 
         let texts = extract_page_texts(&ops);
         let mut state = ParserState::new(debug);
+        let name_regex = Regex::new(r"Card Holder Name\s*[:\-]\s*(.*)").unwrap();
 
         for (i, text) in texts.iter().enumerate() {
             if debug {
@@ -419,9 +442,18 @@ pub fn parse(
             }
 
             // Start of transaction section
-            if text == "Domestic Transactions" || text == "International Transactions" {
+            if text == "Domestic Transactions" || text == "International Transactions" || text.starts_with("Transaction Details") {
                 state.in_transactions = true;
                 state.past_header = false;
+                
+                // Try to extract name from the header line itself
+                if let Some(caps) = name_regex.captures(text) {
+                    let name = caps.get(1).unwrap().as_str().trim().to_string();
+                    state.current_cardholder = name.clone();
+                    state.name_matched = cardholder_name.is_empty() || name.contains(&cardholder_name);
+                } else {
+                    state.name_matched = cardholder_name.is_empty();
+                }
                 continue;
             }
 
@@ -431,11 +463,28 @@ pub fn parse(
 
             // Skip header row until we see cardholder name or PI column
             if !state.past_header {
-                if text == &cardholder_name || text == "PI" {
-                    state.past_header = true;
-                    state.skip_next_non_date = true;
-                    if debug {
-                        eprintln!("=== PAST HEADER (trigger: {}) ===", text);
+                if let Some(caps) = name_regex.captures(text) {
+                    let name = caps.get(1).unwrap().as_str().trim().to_string();
+                    state.current_cardholder = name.clone();
+                    state.name_matched = cardholder_name.is_empty() || name.contains(&cardholder_name);
+                } else if !cardholder_name.is_empty() && text.contains(&cardholder_name) {
+                    state.name_matched = true;
+                    if state.current_cardholder.is_empty() {
+                        state.current_cardholder = text.clone();
+                    }
+                }
+
+                if text == &cardholder_name || text == "PI" || text == "Card Number" {
+                    if state.name_matched || text == "PI" {
+                        state.past_header = true;
+                        state.skip_next_non_date = true;
+                        if debug {
+                            eprintln!("=== PAST HEADER (trigger: {}) ===", text);
+                        }
+                    } else if text == "Card Number" {
+                        // If we reached the end of the header but haven't seen the name,
+                        // this might be a section for a different cardholder.
+                        state.in_transactions = false;
                     }
                 }
                 continue;
@@ -474,7 +523,7 @@ pub fn parse(
             if is_skippable_symbol(text) {
                 if text == "+" {
                     state.is_credit = true;
-                } else if text == "Cr" {
+                } else if text.eq_ignore_ascii_case("cr") {
                     state.transaction.amount = state.transaction.amount.abs();
                 }
                 continue;
@@ -500,17 +549,17 @@ pub fn parse(
                 }
             }
 
-            // Try to parse as points
-            if let Some(p) = parse_points(text) {
-                state.transaction.points = p;
-                continue;
-            }
-
             // After amount, any remaining text is likely a section header (cardholder name)
             if state.has_amount {
                 if debug {
                     eprintln!("=== SKIP POST-AMOUNT TEXT: {} ===", text);
                 }
+                continue;
+            }
+
+            // Try to parse as points
+            if let Some(p) = parse_points(text) {
+                state.transaction.points = p;
                 continue;
             }
 
@@ -602,7 +651,7 @@ fn main() -> Result<(), Error> {
                 .required_unless_present("dir")
                 .conflicts_with("dir"),
         )
-        .arg(arg!(--name <name>).required(true))
+        .arg(arg!(--name <name>).required(false))
         .arg(arg!(--password <password>).required(false))
         .arg(arg!(--sortformat <date_format>).required(false))
         .arg(arg!(--addheaders).required(false))
@@ -659,7 +708,7 @@ fn main() -> Result<(), Error> {
             let mut wtr = csv::Writer::from_writer(io::stdout());
 
             if add_headers {
-                wtr.write_record(["Date", "Description", "Points", "Amount"])
+                wtr.write_record(["Date", "Description", "Points", "Amount", "DR/CR", "Cardholder"])
                     .context("Failed to write headers")?;
             }
 

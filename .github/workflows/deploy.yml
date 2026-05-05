@@ -26,7 +26,7 @@ jobs:
           targets: wasm32-unknown-unknown
 
       - name: Install wasm-pack
-        uses: jetli/wasm-pack-action@0d096b4d05d1d60ee0af42fc26e4745949d89222 # v0.4.0
+        uses: jetli/wasm-pack-action@0d096b08b4e5a7de8c28de67e11e945404e9eefa # v0.4.0
         with:
           version: 'latest'
 

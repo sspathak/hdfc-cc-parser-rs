@@ -29,14 +29,15 @@
             <section id="view-dashboard" class="view">
                 <div class="tool-header">
                     <h2>Process Statements</h2>
-                    <p>Extract transactions and generate spending reports locally.</p>
+                    <p>Extract transactions and generate spending reports locally. <strong>Only PDF files are supported.</strong></p>
                 </div>
 
                 <div class="input-card">
                     <div id="drop-zone" class="upload-area">
                         <div class="upload-prompt">
                             <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                            <p>Click or drag HDFC PDF statements</p>
+                            <p>Select HDFC PDF Statements</p>
+                            <small>Drag and drop or click to browse</small>
                             <input type="file" id="file-input" multiple accept=".pdf" hidden>
                         </div>
                         <div id="file-list" class="file-list hidden"></div>
@@ -48,7 +49,7 @@
                             <input type="password" id="password-input" placeholder="e.g. ABCDE1234F01011990" autocomplete="current-password">
                         </div>
                         <div class="button-group">
-                            <button id="process-btn" class="btn primary" disabled>Analyze Now</button>
+                            <button id="process-btn" class="btn primary" disabled>Analyze</button>
                             <button id="quick-export-btn" class="btn secondary" disabled>Export CSV</button>
                         </div>
                     </div>
@@ -61,28 +62,40 @@
                 </div>
 
                 <div id="results-area" class="results-container hidden">
-                    <div class="summary-stats">
-                        <div class="stat">
-                            <span class="label">Total Spent</span>
-                            <span class="value" id="total-spent">₹0.00</span>
+                    <div class="results-header">
+                        <div class="filter-group">
+                            <label for="cardholder-filter">Cardholder Filter:</label>
+                            <select id="cardholder-filter" class="select-input">
+                                <option value="all">All Cardholders</option>
+                            </select>
                         </div>
-                        <div class="stat">
-                            <span class="label">Points</span>
-                            <span class="value" id="total-points">0</span>
-                        </div>
-                        <div class="stat">
-                            <span class="label">Count</span>
-                            <span class="value" id="total-count">0</span>
+                        <div class="summary-stats">
+                            <div class="stat">
+                                <span class="label">Total Spent</span>
+                                <span class="value" id="total-spent">₹0.00</span>
+                            </div>
+                            <div class="stat">
+                                <span class="label">Total Refund/Pay</span>
+                                <span class="value" id="total-refunds">₹0.00</span>
+                            </div>
+                            <div class="stat">
+                                <span class="label">Total Transactions</span>
+                                <span class="value" id="total-count">0</span>
+                            </div>
                         </div>
                     </div>
 
                     <div class="visuals-grid">
                         <div class="chart-box">
-                            <h3>Monthly Trend</h3>
+                            <div class="chart-header">
+                                <h3>Spending Trend (by Category)</h3>
+                            </div>
                             <div class="canvas-wrapper"><canvas id="trend-chart"></canvas></div>
                         </div>
                         <div class="chart-box">
-                            <h3>Category Breakdown</h3>
+                            <div class="chart-header">
+                                <h3>Total Distribution</h3>
+                            </div>
                             <div class="canvas-wrapper"><canvas id="category-chart"></canvas></div>
                         </div>
                     </div>
@@ -104,12 +117,20 @@
             <section id="view-categories" class="view hidden">
                 <div class="tool-header">
                     <h2>Analysis Settings</h2>
-                    <p>Configure how transactions are categorized.</p>
+                    <p>Configure how transactions are categorized based on their description.</p>
                 </div>
                 <div class="settings-card">
+                    <div class="guide-box">
+                        <h4>How Categorization Works</h4>
+                        <ul>
+                            <li><strong>Partial Match</strong>: The analyzer checks if the transaction description <em>contains</em> any of your keywords (case-insensitive).</li>
+                            <li><strong>Comma Separated</strong>: Enter multiple keywords separated by commas (e.g. <code>Amazon, Amzn, AWS</code>).</li>
+                            <li><strong>Priority</strong>: The analyzer checks categories from top to bottom. The first match wins.</li>
+                        </ul>
+                    </div>
                     <div id="category-list" class="cat-editor"></div>
                     <div class="editor-btns">
-                        <button id="add-category" class="btn small">+ Add Merchant Rule</button>
+                        <button id="add-category" class="btn small">+ Add Category</button>
                         <div class="right">
                             <button id="reset-categories" class="btn small text">Reset Defaults</button>
                             <button id="save-categories" class="btn primary small">Save Changes</button>
@@ -158,7 +179,7 @@
             <div class="footer-note">HDFC Statement Utility &copy; 2026</div>
         </footer>
 
-        <!-- Security Info Modal (Simple) -->
+        <!-- Security Info Modal -->
         <div id="security-modal" class="modal hidden">
             <div class="modal-content">
                 <h3>Security Verification</h3>

@@ -15,6 +15,10 @@ const resultsArea = document.getElementById('results-area');
 const statusContainer = document.getElementById('status-container');
 const progressFill = document.getElementById('progress-fill');
 const statusText = document.getElementById('status-text');
+
+// Multi-select Dropdown Elements
+const toggleDropdownBtn = document.getElementById('toggle-holders-dropdown');
+const holdersDropdown = document.getElementById('holders-dropdown');
 const holderCheckboxes = document.getElementById('holder-checkboxes');
 const selectAllBtn = document.getElementById('select-all-holders');
 const deselectAllBtn = document.getElementById('deselect-all-holders');
@@ -64,7 +68,7 @@ function initWorker() {
             allTransactions = transactions;
             
             if (pendingAction === 'export') {
-                downloadCSV([]); // Pass empty array for "All"
+                downloadCSV([]); 
             } else {
                 renderViewport();
             }
@@ -161,19 +165,17 @@ function startProcessing() {
 function renderViewport() {
     const results = engine.process(allTransactions, []);
     
-    // Populate Checkboxes if first run or empty
-    if (holderCheckboxes.children.length === 0) {
-        holderCheckboxes.innerHTML = results.allCardholders.map(name => `
-            <label class="checkbox-item">
-                <input type="checkbox" value="${name}" checked>
-                <span>${name}</span>
-            </label>
-        `).join('');
-        
-        holderCheckboxes.querySelectorAll('input').forEach(input => {
-            input.addEventListener('change', updateFilteredView);
-        });
-    }
+    // Clear dropdown and populate
+    holderCheckboxes.innerHTML = results.allCardholders.map(name => `
+        <label class="checkbox-item">
+            <input type="checkbox" value="${name}" checked>
+            <span>${name}</span>
+        </label>
+    `).join('');
+    
+    holderCheckboxes.querySelectorAll('input').forEach(input => {
+        input.addEventListener('change', updateFilteredView);
+    });
 
     resultsArea.classList.remove('hidden');
     updateFilteredView();
@@ -183,6 +185,12 @@ function updateFilteredView() {
     const selected = Array.from(holderCheckboxes.querySelectorAll('input:checked')).map(i => i.value);
     const results = engine.process(allTransactions, selected);
 
+    // Update Dropdown Button Text
+    const span = toggleDropdownBtn.querySelector('span');
+    if (selected.length === 0) span.textContent = "Select Cardholders";
+    else if (selected.length === holderCheckboxes.querySelectorAll('input').length) span.textContent = "All Cardholders";
+    else span.textContent = `${selected.length} Selected`;
+
     document.getElementById('total-spent').textContent = `₹${results.summary.totalSpent.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
     document.getElementById('total-refunds').textContent = `₹${results.summary.totalRefunds.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
     document.getElementById('total-count').textContent = results.summary.totalCount;
@@ -190,12 +198,26 @@ function updateFilteredView() {
     renderCharts(results.chartData);
 }
 
-selectAllBtn.addEventListener('click', () => {
+// Dropdown Toggle
+toggleDropdownBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    holdersDropdown.classList.toggle('hidden');
+});
+
+document.addEventListener('click', (e) => {
+    if (!holdersDropdown.contains(e.target) && !toggleDropdownBtn.contains(e.target)) {
+        holdersDropdown.classList.add('hidden');
+    }
+});
+
+selectAllBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
     holderCheckboxes.querySelectorAll('input').forEach(i => i.checked = true);
     updateFilteredView();
 });
 
-deselectAllBtn.addEventListener('click', () => {
+deselectAllBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
     holderCheckboxes.querySelectorAll('input').forEach(i => i.checked = false);
     updateFilteredView();
 });

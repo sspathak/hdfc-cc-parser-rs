@@ -3,6 +3,7 @@ name: Deploy to GitHub Pages
 on:
   push:
     branches: ["main", "feat/webapp-wasm"]
+
   workflow_dispatch:
 
 permissions:

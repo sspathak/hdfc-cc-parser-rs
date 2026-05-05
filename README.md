@@ -1,226 +1,39 @@
-# HDFC CC bill parser (Rust + WASM)
+# HDFC Statement Analyzer & Export Utility
 
-Parse and extract transaction data from HDFC Bank credit card statements to CSV format.
+A professional-grade, privacy-first tool for parsing HDFC Credit Card PDF statements. This utility allows you to extract transactions, categorize spending, and export data to CSV entirely within your browser.
 
-## 🛡️ VaultHDFC Webapp
-A "Vault-Grade" privacy-preserving web application that runs entirely in your browser.
-- **100% Client-Side**: No data ever leaves your machine.
-- **Zero-Trust**: Strict CSP prevents all networking.
-- **Offline Mode**: Works without Wi-Fi.
-- **WASM Powered**: Uses the Rust parser compiled to WebAssembly.
+## Key Features
 
-Located in the `webapp/` directory.
+- **Privacy-First**: Your financial data never leaves your device. Decryption and parsing are performed locally using a Rust engine compiled to WebAssembly (WASM).
+- **Multi-Cardholder Support**: Automatically detects and separates transactions for different cardholders on the same account.
+- **Spending Dashboard**: Visualizes your spending trends with stacked bar charts and category breakdowns.
+- **Quick Export**: One-click generation of clean CSV files compatible with Excel, Google Sheets, and Tally.
+- **Custom Categorization**: Define your own rules to automatically categorize transactions based on description keywords.
 
-> **Note:** This tool currently supports only below cards
-> - **HDFC Infinia credit card statements from September 2025 onwards**. Earlier statement formats are not supported.
-> - **HDFC Regalia Gold credit card** (CSV export tested on 2026 Feb onwards)
-> - **HDFC Rupay UPI credit card** (CSV export tested on 2026 Mar onwards)
+## How it Works
 
-## Features
+1. **Local Decryption**: The PDF is decrypted in your browser memory using the password you provide.
+2. **Rust/WASM Parsing**: A high-performance Rust engine extracts transaction details (Date, Description, Amount, Cardholder).
+3. **Zero-Networking**: The application is governed by a strict Content Security Policy (CSP) that blocks all external network requests.
+4. **Volatile Memory**: Data is stored only in volatile RAM and is automatically wiped when the browser tab is closed.
 
-* Extracts transaction details: date, description, reward points, amount
-* Handles both domestic and international transactions
-* Supports password-protected PDFs
-* Multiple PDFs can be parsed and collated into single CSV
-* **Summary mode**: View spending totals without CSV output
-* **Category breakdown**: Classify spending by categories using a JSON config file
+## Technical Transparency
 
-## Requirements
+This project is entirely open-source and designed to be auditable. 
+- **Parsing Engine**: Written in Rust for safety and performance.
+- **Frontend**: Clean, dependency-light JavaScript and CSS.
+- **Deployment**: Hosted on GitHub Pages via automated Actions.
 
-* Rust (for building from source)
-* HDFC Infinia credit card statements (September 2025+ format)
+## Credits & Attribution
 
-## Installation
+This project is a web-based implementation and enhancement of the HDFC Credit Card Parser.
 
-```bash
-git clone https://github.com/joeirimpan/hdfc-cc-parser-rs.git
-cd hdfc-cc-parser-rs
-cargo build --release
-```
+- **Forked From**: [joeirimpan/hdfc-cc-parser-rs](https://github.com/joeirimpan/hdfc-cc-parser-rs)
+- **Original Author**: Special thanks to **Joe Paul** for the core parsing logic and the original Rust implementation.
 
-## Usage
+## Security Audit
 
-### Basic CSV Export
+The source code is available for public audit at: [https://github.com/sspathak/hdfc-cc-parser-rs](https://github.com/sspathak/hdfc-cc-parser-rs)
 
-```bash
-# Single file
-./target/release/hdfc-cc-parser-rs \
-  --file statement.pdf \
-  --name "YOUR NAME" \
-  --password "PDF_PASSWORD"
-
-# Directory of statements
-./target/release/hdfc-cc-parser-rs \
-  --dir ./statements \
-  --name "YOUR NAME" \
-  --password "PDF_PASSWORD" \
-  --addheaders
-```
-
-### Summary Mode
-
-View spending summary without CSV output:
-
-```bash
-./target/release/hdfc-cc-parser-rs \
-  --dir ./statements \
-  --name "YOUR NAME" \
-  --password "PDF_PASSWORD" \
-  --summary
-```
-
-Output:
-```
-═══════════════════════════════════════════
-              SUMMARY
-═══════════════════════════════════════════
-Total Spent:          ₹      10000.00
-Bill Payment:         ₹      15000.00
-Points Earned:                    100
-Transactions:                      50
-```
-
-### Category Breakdown
-
-Add `--categories` with a JSON file to see spending by category:
-
-```bash
-./target/release/hdfc-cc-parser-rs \
-  --dir ./statements \
-  --name "YOUR NAME" \
-  --password "PDF_PASSWORD" \
-  --summary \
-  --categories examples/categories.json
-```
-
-Output:
-```
-═══════════════════════════════════════════
-              SUMMARY
-═══════════════════════════════════════════
-Total Spent:          ₹      10000.00
-Bill Payment:         ₹      15000.00
-Points Earned:                    100
-Transactions:                      50
-
-───────────────────────────────────────────
-         CATEGORY BREAKDOWN
-───────────────────────────────────────────
-Travel                ₹    3000.00  ( 30.0%)
-Shopping              ₹    2500.00  ( 25.0%)
-Food & Dining         ₹    2000.00  ( 20.0%)
-Uncategorized         ₹    2500.00  ( 25.0%)
-───────────────────────────────────────────
-```
-
-### Categories JSON Format
-
-Create a JSON file mapping category names to merchant patterns:
-
-```json
-{
-  "Food & Dining": ["SWIGGY", "ZOMATO", "BLINKIT", "DOMINOS"],
-  "Travel": ["UBER", "OLA", "IRCTC", "MAKEMYTRIP"],
-  "Shopping": ["AMAZON", "FLIPKART", "MYNTRA"],
-  "Entertainment": ["NETFLIX", "SPOTIFY", "GOOGLE PLAY"],
-  "Utilities": ["JIO", "AIRTEL", "BESCOM"],
-  "Finance": ["IGST", "GST", "FINANCE CHARGES"]
-}
-```
-
-Patterns are matched case-insensitively against transaction descriptions.
-
-## CLI Options
-
-| Option | Description |
-|--------|-------------|
-| `--file <path>` | Path to a single PDF statement |
-| `--dir <path>` | Path to directory containing PDF statements |
-| `--name <name>` | Cardholder name as it appears on the statement (required) |
-| `--password <pwd>` | PDF password (if encrypted) |
-| `--addheaders` | Add CSV header row to output |
-| `--sortformat <fmt>` | Date format in filenames for sorting (e.g., `%d-%m-%Y`) |
-| `--summary` | Show summary only (no CSV output) |
-| `--categories <file>` | JSON file for category breakdown (requires `--summary`) |
-
-## Performance
-
-A similar Python implementation using tabula-py took 70s+ to process 8 PDFs. This Rust implementation processes the same in ~0.02s.
-
-## Spending Analyzer
-
-A Python script for detailed spending analysis with visualizations.
-
-### Features
-
-* Monthly breakdown by category
-* Month-over-month trend analysis
-* Category trend comparison (first half vs second half)
-* Spending volatility metrics
-* Visual charts (bar graphs, stacked category charts)
-* Support for custom billing cycle start dates (1-31)
-
-### Usage
-
-```bash
-# Basic analysis (calendar months)
-python analyze_spending.py --csv dump.csv --categories categories.json
-
-# Custom billing cycle (e.g., 16th to 16th)
-python analyze_spending.py --csv dump.csv --categories categories.json --cycle-start 16
-
-# Skip graph generation
-python analyze_spending.py --csv dump.csv --categories categories.json --no-graph
-```
-
-### Options
-
-| Option | Description |
-|--------|-------------|
-| `--csv <path>` | Path to transaction CSV file (default: dump.csv) |
-| `--categories <path>` | Path to categories JSON file (default: custom.json) |
-| `--output <path>` | Output path for graph (default: spending_analysis.png) |
-| `--cycle-start <day>` | Day of month when billing cycle starts (1-31, default: 1) |
-| `--no-graph` | Skip graph generation |
-
-For `--cycle-start` values 29-31, the script automatically adjusts for shorter months (Feb uses 28/29, Apr/Jun/Sep/Nov use 30).
-
-### Sample Output
-
-![Spending Analysis](examples/spending_analysis.png)
-
-### Dependencies
-
-```bash
-pip install matplotlib
-```
-
-## Examples
-
-The `examples/` folder contains sample files:
-
-* `dump.csv` - Sample transaction data
-* `categories.json` - Sample category patterns
-* `spending_analysis.png` - Sample generated chart
-
-## Analytics with ClickHouse
-
-For advanced analytics on CSV output using `clickhouse-local`:
-
-```bash
-# Total points accumulated
-cat output.csv | clickhouse-local \
-  --structure "tx_date Datetime, tx String, points Int32, amount Float32" \
-  --query "SELECT SUM(points) FROM table" \
-  --input-format CSV
-
-# Total debits
-cat output.csv | clickhouse-local \
-  --structure "tx_date Datetime, tx String, points Int32, amount Float32" \
-  --query "SELECT SUM(amount) FROM table WHERE amount < 0" \
-  --input-format CSV
-```
-
-## License
-
-MIT
+---
+Copyright Suraj Pathak &copy; 2026

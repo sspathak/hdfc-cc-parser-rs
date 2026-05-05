@@ -15,6 +15,7 @@ const resultsArea = document.getElementById('results-area');
 const statusContainer = document.getElementById('status-container');
 const progressFill = document.getElementById('progress-fill');
 const statusText = document.getElementById('status-text');
+const cardholderFilter = document.getElementById('cardholder-filter');
 
 // Security Modal
 const securityTrigger = document.getElementById('security-info-trigger');
@@ -24,11 +25,17 @@ const closeModal = document.getElementById('close-modal');
 securityTrigger?.addEventListener('click', () => securityModal.classList.remove('hidden'));
 closeModal?.addEventListener('click', () => securityModal.classList.add('hidden'));
 
+// Colors (Pastel Palette)
+const PASTEL_COLORS = [
+    '#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', 
+    '#9BF6FF', '#A0C4FF', '#BDB2FF', '#FFC6FF', '#E2E8F0'
+];
+
 // State
 let selectedFiles = [];
 const engine = new AnalysisEngine();
 let worker = null;
-let currentTransactions = [];
+let allTransactions = [];
 let pendingAction = 'analyze'; // 'analyze' or 'export'
 
 // Initialize Worker
@@ -45,13 +52,14 @@ function initWorker() {
             statusText.textContent = `Parsing ${fileName}...`;
         } else if (type === 'done') {
             statusContainer.classList.add('hidden');
-            currentTransactions = transactions;
+            processBtn.disabled = false;
+            quickExportBtn.disabled = false;
+            allTransactions = transactions;
+            
             if (pendingAction === 'export') {
                 downloadCSV();
-                processBtn.disabled = false;
-                quickExportBtn.disabled = false;
             } else {
-                displayResults(transactions);
+                displayResults();
             }
         } else if (type === 'error') {
             statusContainer.classList.add('hidden');
@@ -144,16 +152,29 @@ function startProcessing() {
     });
 }
 
-function displayResults(transactions) {
-    const results = engine.process(transactions);
+function displayResults() {
+    const filter = cardholderFilter.value;
+    const results = engine.process(allTransactions, filter);
     
+    // Update Filter Options if first run
+    if (cardholderFilter.options.length <= 1) {
+        results.allCardholders.forEach(name => {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = name;
+            cardholderFilter.appendChild(opt);
+        });
+    }
+
     document.getElementById('total-spent').textContent = `₹${results.summary.totalSpent.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
-    document.getElementById('total-points').textContent = results.summary.totalPoints.toLocaleString();
+    document.getElementById('total-refunds').textContent = `₹${results.summary.totalRefunds.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
     document.getElementById('total-count').textContent = results.summary.totalCount;
     
     resultsArea.classList.remove('hidden');
     renderCharts(results.chartData);
 }
+
+cardholderFilter.addEventListener('change', displayResults);
 
 // Charting
 let trendChart = null;
@@ -168,22 +189,21 @@ async function renderCharts(chartData) {
         type: 'bar',
         data: {
             labels: chartData.months,
-            datasets: [{
-                label: 'Spending',
-                data: chartData.totals,
-                backgroundColor: '#2563eb',
-                borderRadius: 4,
-            }]
+            datasets: chartData.stackedDatasets.map((ds, i) => ({
+                ...ds,
+                backgroundColor: PASTEL_COLORS[i % PASTEL_COLORS.length],
+                borderRadius: 2
+            }))
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { 
-                legend: { display: false }
+                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } }
             },
             scales: { 
-                y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
-                x: { grid: { display: false } }
+                y: { stacked: true, beginAtZero: true, grid: { color: '#f1f5f9' } },
+                x: { stacked: true, grid: { display: false } }
             }
         }
     });
@@ -194,11 +214,8 @@ async function renderCharts(chartData) {
         data: {
             labels: chartData.categoryData.map(d => d.label),
             datasets: [{
-                data: chartData.categoryData.map(d => d.data.reduce((a, b) => a + b, 0)),
-                backgroundColor: [
-                    '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', 
-                    '#bfdbfe', '#dbeafe', '#f1f5f9', '#cbd5e1', '#94a3b8'
-                ],
+                data: chartData.categoryData.map(d => d.value),
+                backgroundColor: PASTEL_COLORS,
                 borderWidth: 1,
                 borderColor: '#fff'
             }]
@@ -208,7 +225,7 @@ async function renderCharts(chartData) {
             maintainAspectRatio: false,
             cutout: '60%',
             plugins: { 
-                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
+                legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } }
             }
         }
     });
@@ -267,21 +284,24 @@ document.getElementById('save-categories').addEventListener('click', () => {
 document.getElementById('download-csv').addEventListener('click', downloadCSV);
 
 function downloadCSV() {
-    if (currentTransactions.length === 0) return;
+    if (allTransactions.length === 0) return;
     
-    let csv = 'Date,Description,Points,Amount,DR/CR,Cardholder\n';
-    currentTransactions.forEach(t => {
+    const filter = cardholderFilter.value;
+    const filtered = filter === 'all' ? allTransactions : allTransactions.filter(t => t.cardholder === filter);
+    
+    let csv = 'Date,Description,Amount,DR/CR,Cardholder\n';
+    filtered.forEach(t => {
         const date = t.date.split('T')[0];
-        const dr_cr = t.amount < 0 ? 'DR' : 'CR';
+        const dr_cr = t.amount > 0 ? 'DR' : 'CR'; // Debit is spending (+), Credit is refund (-)
         const absAmount = Math.abs(t.amount);
-        csv += `"${date}","${t.description.replace(/"/g, '""')}",${t.points},${absAmount},${dr_cr},"${t.cardholder}"\n`;
+        csv += `"${date}","${t.description.replace(/"/g, '""')}",${absAmount},${dr_cr},"${t.cardholder}"\n`;
     });
     
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `hdfc_export_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `hdfc_export_${filter === 'all' ? 'all' : filter}_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
 }
 

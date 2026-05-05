@@ -284,10 +284,8 @@ fn parse_internal(data: &[u8], password: &str, cardholder_name: &str) -> Result<
             }
 
             if is_skippable_symbol(&text) {
-                if text == "+" {
-                    state.is_credit = true;
-                } else if text.eq_ignore_ascii_case("cr") {
-                    state.transaction.amount = state.transaction.amount.abs();
+                if text == "+" || text.eq_ignore_ascii_case("cr") {
+                    state.transaction.amount = -state.transaction.amount.abs();
                 }
                 continue;
             }
@@ -302,10 +300,15 @@ fn parse_internal(data: &[u8], password: &str, cardholder_name: &str) -> Result<
             }
 
             if text.contains('.') {
-                if let Some(amt) = parse_amount(&text, state.is_credit) {
+                if let Some(mut amt) = parse_amount(&text, false) {
+                    // Check if description already contains CR (sometimes it's in the same block)
+                    if state.desc_parts.iter().any(|p| p.to_uppercase().contains("CR")) {
+                        amt = -amt.abs();
+                    } else {
+                        amt = amt.abs(); // Spending is positive
+                    }
                     state.transaction.amount = amt;
                     state.has_amount = true;
-                    state.is_credit = false;
                     continue;
                 }
             }

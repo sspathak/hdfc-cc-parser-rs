@@ -1,137 +1,97 @@
-/**
- * Analysis Engine
- * Ports the logic from analyze_spending.py to JavaScript.
- * Strictly follows the "No Persistence" rule for transaction data.
- */
-
 export const DEFAULT_CATEGORIES = {
-    "Travel": ["Indigo", "Air India", "Vistara", "Akasa", "MakeMyTrip", "Uber", "Ola", "IRCTC"],
-    "Shopping": ["Myntra", "Ajio", "Zudio", "Lifestyle", "Shoppers Stop", "Nykaa"],
-    "Amazon": ["Amazon", "AMZN"],
-    "Food & Dining": ["Swiggy", "Zomato", "Starbucks", "Dominos", "Pizza Hut", "KFC"],
-    "Healthcare": ["Apollo", "Pharmeasy", "Hospital", "Clinic", "Diagnostics"],
-    "Fuel": ["HPCL", "BPCL", "IOCL", "Shell"],
-    "Utilities": ["BESCOM", "Airtel", "Jio", "Vodafone", "Insurance", "TATA SKY"],
-    "Groceries": ["Bigbasket", "Blinkit", "Zepto", "Instamart", "Reliance Retail", "DMart"]
+    "Dining": ["SWIGGY", "ZOMATO", "EATS", "RESTAURANT", "FOOD", "CAFE", "BAKERY", "PIZZA"],
+    "Groceries": ["BLINKIT", "BIGBASKET", "ZEPTO", "GROCERY", "SUPERMARKET", "RETAIL"],
+    "Shopping": ["AMAZON", "FLIPKART", "MYNTRA", "AJIO", "SHOPPING", "NYKAA"],
+    "Travel": ["UBER", "OLA", "IRCTC", "INDIGO", "AIRLINES", "MAKEMYTRIP", "MTRIP", "CLEARTRIP", "HOTEL"],
+    "Utilities": ["BESCOM", "AIRTEL", "JIO", "VODAFONE", "ACT", "BROADBAND", "ELECTRICITY", "WATER"],
+    "Health": ["PHARMEASY", "APOLLO", "HOSPITAL", "CLINIC", "MEDICAL"],
+    "Entertainment": ["BOOKMYSHOW", "NETFLIX", "PRIME VIDEO", "DISNEY", "CINEMA"],
+    "Fuel": ["HPCL", "BPCL", "IOCL", "SHELL", "FUEL", "PETROL"],
+    "Other": []
 };
 
 export class AnalysisEngine {
     constructor() {
-        this.categories = this.loadCategories();
-    }
-
-    loadCategories() {
-        const saved = localStorage.getItem('vault_categories');
-        return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES;
+        this.categories = JSON.parse(localStorage.getItem('hdfc_categories')) || DEFAULT_CATEGORIES;
     }
 
     saveCategories(categories) {
         if (!categories) {
             this.categories = DEFAULT_CATEGORIES;
-            localStorage.removeItem('vault_categories');
+            localStorage.removeItem('hdfc_categories');
         } else {
             this.categories = categories;
-            localStorage.setItem('vault_categories', JSON.stringify(categories));
+            localStorage.setItem('hdfc_categories', JSON.stringify(categories));
         }
     }
 
     categorize(description) {
-        const descUpper = description.toUpperCase();
+        const desc = description.toUpperCase();
         for (const [category, patterns] of Object.entries(this.categories)) {
-            for (const pattern of patterns) {
-                if (descUpper.includes(pattern.toUpperCase())) {
-                    return category;
-                }
+            if (patterns.some(p => desc.includes(p.toUpperCase()))) {
+                return category;
             }
         }
-        return "Uncategorized";
+        return "Other";
     }
 
-    /**
-     * Process a list of transactions and return summary & chart data.
-     */
-    process(transactions, cycleStartDay = 1) {
-        const monthlyData = {};
-        const monthlyTotals = {};
-        let totalSpent = 0;
-        let totalPoints = 0;
+    process(transactions, cardholderFilter = 'all') {
+        let filtered = transactions;
+        if (cardholderFilter !== 'all') {
+            filtered = transactions.filter(t => t.cardholder === cardholderFilter);
+        }
 
-        transactions.forEach(t => {
-            const amount = t.amount;
-            const desc = t.description;
+        const summary = {
+            totalSpent: 0,
+            totalRefunds: 0,
+            totalCount: filtered.length
+        };
+
+        const monthlyData = {}; // { "Jan 2024": { "Dining": 100, "Shopping": 200, ... } }
+        const categoriesTotal = {};
+
+        filtered.forEach(t => {
             const date = new Date(t.date);
+            const monthKey = date.toLocaleString('default', { month: 'short', year: 'numeric' });
             
-            // Skip actual card payments
-            const descUpper = desc.toUpperCase();
-            if (descUpper.includes("CREDIT CARD PAYMENT") || descUpper.includes("NETBANKING TRANSFER")) {
-                return;
-            }
+            if (!monthlyData[monthKey]) monthlyData[monthKey] = {};
 
-            const monthKey = this.getCycleKey(date, cycleStartDay);
-            
-            if (!monthlyData[monthKey]) {
-                monthlyData[monthKey] = {};
-                monthlyTotals[monthKey] = 0;
-            }
-
-            if (amount < 0) {
-                // Spending
-                const category = this.categorize(desc);
-                const spend = Math.abs(amount);
+            const amount = t.amount;
+            if (amount > 0) {
+                // Spending (Debit)
+                summary.totalSpent += amount;
+                const cat = this.categorize(t.description);
                 
-                monthlyData[monthKey][category] = (monthlyData[monthKey][category] || 0) + spend;
-                monthlyTotals[monthKey] += spend;
-                totalSpent += spend;
-                totalPoints += (t.points || 0);
+                monthlyData[monthKey][cat] = (monthlyData[monthKey][cat] || 0) + amount;
+                categoriesTotal[cat] = (categoriesTotal[cat] || 0) + amount;
             } else {
-                // Credit/Refund
-                monthlyTotals[monthKey] -= amount;
-                totalSpent -= amount;
+                // Refund / Payment (Credit)
+                summary.totalRefunds += Math.abs(amount);
             }
         });
 
+        // Prepare chart data
+        const sortedMonths = Object.keys(monthlyData).sort((a, b) => new Date(a) - new Date(b));
+        const allCategories = Object.keys(this.categories);
+
+        const stackedDatasets = allCategories.map(cat => ({
+            label: cat,
+            data: sortedMonths.map(month => monthlyData[month][cat] || 0)
+        }));
+
+        const categoryData = allCategories.map(cat => ({
+            label: cat,
+            value: categoriesTotal[cat] || 0
+        })).filter(c => c.value > 0);
+
         return {
-            summary: {
-                totalSpent,
-                totalPoints,
-                totalCount: transactions.length
+            summary,
+            chartData: {
+                months: sortedMonths,
+                stackedDatasets,
+                categoryData
             },
-            monthlyData,
-            monthlyTotals,
-            chartData: this.prepareChartData(monthlyData, monthlyTotals)
-        };
-    }
-
-    getCycleKey(date, cycleStartDay) {
-        if (cycleStartDay === 1) {
-            return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        }
-        
-        // Simplified billing cycle logic for JS
-        const year = date.getFullYear();
-        const month = date.getMonth(); // 0-11
-        const day = date.getDate();
-
-        if (day <= cycleStartDay) {
-            // Belongs to previous cycle
-            const prevDate = new Date(year, month - 1, 1);
-            return `${prevDate.getFullYear()}-${String(prevDate.getMonth() + 1).padStart(2, '0')}`;
-        } else {
-            return `${year}-${String(month + 1).padStart(2, '0')}`;
-        }
-    }
-
-    prepareChartData(monthlyData, monthlyTotals) {
-        const sortedMonths = Object.keys(monthlyTotals).sort();
-        const categories = [...Object.keys(this.categories), "Uncategorized"];
-        
-        return {
-            months: sortedMonths,
-            totals: sortedMonths.map(m => monthlyTotals[m]),
-            categoryData: categories.map(cat => ({
-                label: cat,
-                data: sortedMonths.map(m => monthlyData[m][cat] || 0)
-            }))
+            allCardholders: [...new Set(transactions.map(t => t.cardholder))]
         };
     }
 }

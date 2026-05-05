@@ -35,10 +35,10 @@ export class AnalysisEngine {
         return "Other";
     }
 
-    process(transactions, cardholderFilter = 'all') {
+    process(transactions, cardholderFilters = []) {
         let filtered = transactions;
-        if (cardholderFilter !== 'all') {
-            filtered = transactions.filter(t => t.cardholder === cardholderFilter);
+        if (cardholderFilters.length > 0 && !cardholderFilters.includes('all')) {
+            filtered = transactions.filter(t => cardholderFilters.includes(t.cardholder));
         }
 
         const summary = {

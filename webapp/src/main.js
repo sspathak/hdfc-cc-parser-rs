@@ -15,15 +15,22 @@ const resultsArea = document.getElementById('results-area');
 const statusContainer = document.getElementById('status-container');
 const progressFill = document.getElementById('progress-fill');
 const statusText = document.getElementById('status-text');
-const cardholderFilter = document.getElementById('cardholder-filter');
+const holderCheckboxes = document.getElementById('holder-checkboxes');
+const selectAllBtn = document.getElementById('select-all-holders');
+const deselectAllBtn = document.getElementById('deselect-all-holders');
 
 // Security Modal
 const securityTrigger = document.getElementById('security-info-trigger');
 const securityModal = document.getElementById('security-modal');
 const closeModal = document.getElementById('close-modal');
+const modalToAbout = document.getElementById('modal-to-about');
 
 securityTrigger?.addEventListener('click', () => securityModal.classList.remove('hidden'));
 closeModal?.addEventListener('click', () => securityModal.classList.add('hidden'));
+modalToAbout?.addEventListener('click', () => {
+    securityModal.classList.add('hidden');
+    document.getElementById('nav-about').click();
+});
 
 // Colors (Pastel Palette)
 const PASTEL_COLORS = [
@@ -57,9 +64,9 @@ function initWorker() {
             allTransactions = transactions;
             
             if (pendingAction === 'export') {
-                downloadCSV();
+                downloadCSV([]); // Pass empty array for "All"
             } else {
-                displayResults();
+                renderViewport();
             }
         } else if (type === 'error') {
             statusContainer.classList.add('hidden');
@@ -142,7 +149,6 @@ function startProcessing() {
     
     processBtn.disabled = true;
     quickExportBtn.disabled = true;
-    resultsArea.classList.add('hidden');
     statusContainer.classList.remove('hidden');
     progressFill.style.width = '0%';
     
@@ -152,29 +158,47 @@ function startProcessing() {
     });
 }
 
-function displayResults() {
-    const filter = cardholderFilter.value;
-    const results = engine.process(allTransactions, filter);
+function renderViewport() {
+    const results = engine.process(allTransactions, []);
     
-    // Update Filter Options if first run
-    if (cardholderFilter.options.length <= 1) {
-        results.allCardholders.forEach(name => {
-            const opt = document.createElement('option');
-            opt.value = name;
-            opt.textContent = name;
-            cardholderFilter.appendChild(opt);
+    // Populate Checkboxes if first run or empty
+    if (holderCheckboxes.children.length === 0) {
+        holderCheckboxes.innerHTML = results.allCardholders.map(name => `
+            <label class="checkbox-item">
+                <input type="checkbox" value="${name}" checked>
+                <span>${name}</span>
+            </label>
+        `).join('');
+        
+        holderCheckboxes.querySelectorAll('input').forEach(input => {
+            input.addEventListener('change', updateFilteredView);
         });
     }
+
+    resultsArea.classList.remove('hidden');
+    updateFilteredView();
+}
+
+function updateFilteredView() {
+    const selected = Array.from(holderCheckboxes.querySelectorAll('input:checked')).map(i => i.value);
+    const results = engine.process(allTransactions, selected);
 
     document.getElementById('total-spent').textContent = `₹${results.summary.totalSpent.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
     document.getElementById('total-refunds').textContent = `₹${results.summary.totalRefunds.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
     document.getElementById('total-count').textContent = results.summary.totalCount;
     
-    resultsArea.classList.remove('hidden');
     renderCharts(results.chartData);
 }
 
-cardholderFilter.addEventListener('change', displayResults);
+selectAllBtn.addEventListener('click', () => {
+    holderCheckboxes.querySelectorAll('input').forEach(i => i.checked = true);
+    updateFilteredView();
+});
+
+deselectAllBtn.addEventListener('click', () => {
+    holderCheckboxes.querySelectorAll('input').forEach(i => i.checked = false);
+    updateFilteredView();
+});
 
 // Charting
 let trendChart = null;
@@ -281,18 +305,22 @@ document.getElementById('save-categories').addEventListener('click', () => {
 });
 
 // CSV Download
-document.getElementById('download-csv').addEventListener('click', downloadCSV);
+document.getElementById('download-csv').addEventListener('click', () => {
+    const selected = Array.from(holderCheckboxes.querySelectorAll('input:checked')).map(i => i.value);
+    downloadCSV(selected);
+});
 
-function downloadCSV() {
+function downloadCSV(filters) {
     if (allTransactions.length === 0) return;
     
-    const filter = cardholderFilter.value;
-    const filtered = filter === 'all' ? allTransactions : allTransactions.filter(t => t.cardholder === filter);
+    const filtered = (filters.length === 0) 
+        ? allTransactions 
+        : allTransactions.filter(t => filters.includes(t.cardholder));
     
     let csv = 'Date,Description,Amount,DR/CR,Cardholder\n';
     filtered.forEach(t => {
         const date = t.date.split('T')[0];
-        const dr_cr = t.amount > 0 ? 'DR' : 'CR'; // Debit is spending (+), Credit is refund (-)
+        const dr_cr = t.amount > 0 ? 'DR' : 'CR';
         const absAmount = Math.abs(t.amount);
         csv += `"${date}","${t.description.replace(/"/g, '""')}",${absAmount},${dr_cr},"${t.cardholder}"\n`;
     });
@@ -301,12 +329,12 @@ function downloadCSV() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `hdfc_export_${filter === 'all' ? 'all' : filter}_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `hdfc_export_${filters.length === 0 ? 'all' : filters.join('_')}_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
 }
 
 document.getElementById('clear-data').addEventListener('click', () => {
-    if (confirm('Clear session and wipe data?')) window.location.reload();
+    if (confirm('Clear entire session and wipe data from memory?')) window.location.reload();
 });
 
 // Service Worker

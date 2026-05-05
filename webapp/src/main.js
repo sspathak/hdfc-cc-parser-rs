@@ -7,23 +7,33 @@ const views = document.querySelectorAll('.view');
 const navButtons = document.querySelectorAll('nav button');
 const dropZone = document.getElementById('drop-zone');
 const fileInput = document.getElementById('file-input');
+const fileList = document.getElementById('file-list');
 const passwordInput = document.getElementById('password-input');
 const processBtn = document.getElementById('process-btn');
+const quickExportBtn = document.getElementById('quick-export-btn');
 const resultsArea = document.getElementById('results-area');
 const statusContainer = document.getElementById('status-container');
 const progressFill = document.getElementById('progress-fill');
 const statusText = document.getElementById('status-text');
+
+// Security Modal
+const securityTrigger = document.getElementById('security-info-trigger');
+const securityModal = document.getElementById('security-modal');
+const closeModal = document.getElementById('close-modal');
+
+securityTrigger?.addEventListener('click', () => securityModal.classList.remove('hidden'));
+closeModal?.addEventListener('click', () => securityModal.classList.add('hidden'));
 
 // State
 let selectedFiles = [];
 const engine = new AnalysisEngine();
 let worker = null;
 let currentTransactions = [];
+let pendingAction = 'analyze'; // 'analyze' or 'export'
 
 // Initialize Worker
 function initWorker() {
     if (worker) worker.terminate();
-    // Using Vite's worker constructor
     worker = new Worker(new URL('./worker.js', import.meta.url), { type: 'module' });
     
     worker.onmessage = (e) => {
@@ -32,14 +42,22 @@ function initWorker() {
         if (type === 'progress') {
             const percent = (current / total) * 100;
             progressFill.style.width = `${percent}%`;
-            statusText.textContent = `Parsing ${fileName} (${current}/${total})...`;
+            statusText.textContent = `Parsing ${fileName}...`;
         } else if (type === 'done') {
             statusContainer.classList.add('hidden');
-            displayResults(transactions);
+            currentTransactions = transactions;
+            if (pendingAction === 'export') {
+                downloadCSV();
+                processBtn.disabled = false;
+                quickExportBtn.disabled = false;
+            } else {
+                displayResults(transactions);
+            }
         } else if (type === 'error') {
             statusContainer.classList.add('hidden');
             alert(`Error: ${message}`);
             processBtn.disabled = false;
+            quickExportBtn.disabled = false;
         }
     };
 }
@@ -80,7 +98,14 @@ fileInput.addEventListener('change', () => handleFiles(fileInput.files));
 function handleFiles(files) {
     selectedFiles = Array.from(files).filter(f => f.type === 'application/pdf');
     if (selectedFiles.length > 0) {
-        dropZone.querySelector('p').innerHTML = `Selected <span>${selectedFiles.length} files</span>`;
+        fileList.innerHTML = selectedFiles.map(f => `
+            <div class="file-item">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><polyline points="13 2 13 9 20 9"/></svg>
+                ${f.name}
+            </div>
+        `).join('');
+        fileList.classList.remove('hidden');
+        document.querySelector('.upload-prompt').classList.add('hidden');
         checkReady();
     }
 }
@@ -88,14 +113,27 @@ function handleFiles(files) {
 passwordInput.addEventListener('input', checkReady);
 
 function checkReady() {
-    processBtn.disabled = !(selectedFiles.length > 0 && passwordInput.value.length > 0);
+    const ready = (selectedFiles.length > 0 && passwordInput.value.length > 0);
+    processBtn.disabled = !ready;
+    quickExportBtn.disabled = !ready;
 }
 
 // Processing
 processBtn.addEventListener('click', () => {
+    pendingAction = 'analyze';
+    startProcessing();
+});
+
+quickExportBtn.addEventListener('click', () => {
+    pendingAction = 'export';
+    startProcessing();
+});
+
+function startProcessing() {
     if (!worker) initWorker();
     
     processBtn.disabled = true;
+    quickExportBtn.disabled = true;
     resultsArea.classList.add('hidden');
     statusContainer.classList.remove('hidden');
     progressFill.style.width = '0%';
@@ -104,10 +142,9 @@ processBtn.addEventListener('click', () => {
         files: selectedFiles,
         password: passwordInput.value
     });
-});
+}
 
 function displayResults(transactions) {
-    currentTransactions = transactions;
     const results = engine.process(transactions);
     
     document.getElementById('total-spent').textContent = `₹${results.summary.totalSpent.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`;
@@ -132,36 +169,21 @@ async function renderCharts(chartData) {
         data: {
             labels: chartData.months,
             datasets: [{
-                label: 'Total Spending',
+                label: 'Spending',
                 data: chartData.totals,
-                backgroundColor: '#6366f1',
-                borderRadius: 8,
-                barThickness: 32,
+                backgroundColor: '#2563eb',
+                borderRadius: 4,
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { 
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: '#1e293b',
-                    titleFont: { family: 'Outfit', size: 14 },
-                    bodyFont: { family: 'Plus Jakarta Sans', size: 13 },
-                    padding: 12,
-                    displayColors: false
-                }
+                legend: { display: false }
             },
             scales: { 
-                y: { 
-                    beginAtZero: true,
-                    grid: { color: 'rgba(255,255,255,0.05)' },
-                    ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans' } }
-                },
-                x: {
-                    grid: { display: false },
-                    ticks: { color: '#94a3b8', font: { family: 'Plus Jakarta Sans' } }
-                }
+                y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                x: { grid: { display: false } }
             }
         }
     });
@@ -174,22 +196,19 @@ async function renderCharts(chartData) {
             datasets: [{
                 data: chartData.categoryData.map(d => d.data.reduce((a, b) => a + b, 0)),
                 backgroundColor: [
-                    '#6366f1', '#8b5cf6', '#10b981', '#f59e0b', 
-                    '#ef4444', '#ec4899', '#06b6d4', '#f97316', '#64748b'
+                    '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd', 
+                    '#bfdbfe', '#dbeafe', '#f1f5f9', '#cbd5e1', '#94a3b8'
                 ],
-                borderWidth: 0,
-                hoverOffset: 15
+                borderWidth: 1,
+                borderColor: '#fff'
             }]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
-            cutout: '70%',
+            cutout: '60%',
             plugins: { 
-                legend: { 
-                    position: 'right',
-                    labels: { color: '#f8fafc', font: { family: 'Plus Jakarta Sans', size: 12 }, padding: 20 }
-                }
+                legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 } } }
             }
         }
     });
@@ -202,15 +221,13 @@ function renderCategoryEditor() {
     
     Object.entries(engine.categories).forEach(([name, patterns]) => {
         const div = document.createElement('div');
-        div.className = 'category-item';
+        div.className = 'cat-row';
         div.innerHTML = `
-            <input type="text" value="${name}" class="cat-name" placeholder="Category Name">
-            <input type="text" value="${patterns.join(', ')}" class="cat-patterns" placeholder="patterns, separated, by, comma">
-            <button class="remove-cat danger">×</button>
+            <input type="text" value="${name}" class="cat-name-in" placeholder="Category">
+            <input type="text" value="${patterns.join(', ')}" class="cat-patt-in" placeholder="Keywords...">
+            <button class="remove-cat-btn">×</button>
         `;
-        div.querySelector('.remove-cat').addEventListener('click', () => {
-            div.remove();
-        });
+        div.querySelector('.remove-cat-btn').addEventListener('click', () => div.remove());
         list.appendChild(div);
     });
 }
@@ -218,38 +235,38 @@ function renderCategoryEditor() {
 document.getElementById('add-category').addEventListener('click', () => {
     const list = document.getElementById('category-list');
     const div = document.createElement('div');
-    div.className = 'category-item';
+    div.className = 'cat-row';
     div.innerHTML = `
-        <input type="text" value="" class="cat-name" placeholder="Category Name">
-        <input type="text" value="" class="cat-patterns" placeholder="patterns, separated, by, comma">
-        <button class="remove-cat danger">×</button>
+        <input type="text" value="" class="cat-name-in" placeholder="Category">
+        <input type="text" value="" class="cat-patt-in" placeholder="Keywords...">
+        <button class="remove-cat-btn">×</button>
     `;
-    div.querySelector('.remove-cat').addEventListener('click', () => {
-        div.remove();
-    });
+    div.querySelector('.remove-cat-btn').addEventListener('click', () => div.remove());
     list.appendChild(div);
 });
 
 document.getElementById('reset-categories').addEventListener('click', () => {
-    if (confirm('Reset to default categories? This will overwrite your changes.')) {
-        engine.saveCategories(null); // Passing null resets to default in engine
+    if (confirm('Reset to default rules?')) {
+        engine.saveCategories(null);
         renderCategoryEditor();
     }
 });
 
 document.getElementById('save-categories').addEventListener('click', () => {
     const newCategories = {};
-    document.querySelectorAll('.category-item').forEach(item => {
-        const name = item.querySelector('.cat-name').value;
-        const patterns = item.querySelector('.cat-patterns').value.split(',').map(p => p.trim()).filter(p => p);
+    document.querySelectorAll('.cat-row').forEach(item => {
+        const name = item.querySelector('.cat-name-in').value;
+        const patterns = item.querySelector('.cat-patt-in').value.split(',').map(p => p.trim()).filter(p => p);
         if (name && patterns.length > 0) newCategories[name] = patterns;
     });
     engine.saveCategories(newCategories);
-    alert('Categories saved locally!');
+    alert('Settings saved.');
 });
 
 // CSV Download
-document.getElementById('download-csv').addEventListener('click', () => {
+document.getElementById('download-csv').addEventListener('click', downloadCSV);
+
+function downloadCSV() {
     if (currentTransactions.length === 0) return;
     
     let csv = 'Date,Description,Points,Amount,DR/CR,Cardholder\n';
@@ -264,21 +281,18 @@ document.getElementById('download-csv').addEventListener('click', () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `hdfc_transactions_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `hdfc_export_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
-});
+}
 
 document.getElementById('clear-data').addEventListener('click', () => {
-    if (confirm('Clear all session data? This will wipe transactions from memory.')) {
-        window.location.reload();
-    }
+    if (confirm('Clear session and wipe data?')) window.location.reload();
 });
 
-// Service Worker Registration for Offline Support
+// Service Worker
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js')
-            .then(reg => console.log('Service Worker registered:', reg))
-            .catch(err => console.log('Service Worker registration failed:', err));
+        navigator.serviceWorker.register('./sw.js')
+            .catch(err => console.log('SW failed:', err));
     });
 }
